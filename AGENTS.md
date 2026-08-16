@@ -13,10 +13,12 @@ Design constraints (do not break these):
   accumulate without input, but no keypress means no marker ever (anti-AFK). If the key is unbound
   the plugin toasts once to point at the setting. Keypresses are ignored while a GUI control has
   keyboard focus (chat / text fields).
-- **Rolling memory between presses:** only the N most recent detections are remembered while
-  waiting for the keypress (`Config.RememberedDetections`, default 5, 0 = remember everything);
-  `AutoGpsService.TrimMemory` enforces it on `s_pendingSizing` + `s_pending` (FIFO, oldest first)
-  every update, so an unbounded backlog can never build up.
+- **Marker cap per press:** one keypress creates at most N NEW markers (`Config.MaxMarkersPerPress`,
+  default 5, slider 0-5, 0 = no limit) - the most recent candidates, by recency (monotonic
+  per-detection sequence `s_seq` -> `FoundOre.Seq` -> `Component.Seq`, max over cluster members).
+  The cap is applied in `Publish` AFTER clustering (a wide deposit or a whole small-ore field
+  counts as ONE marker) and candidates that match an existing published marker (`FindMatch` -
+  the same rule `HandleComponent` uses) bypass it: updates/merges/upgrades are never limited.
 - **Vanilla-information limit (PluginHub requirement):** size figures must not expose more than
   vanilla knows. Rough sizes are fine, but yields are computed from a **baseline variant per ORE**
   (`VoxelScan.BaselineYield`: `<Ore>_01`, else ore-named material, else richest variant) - never

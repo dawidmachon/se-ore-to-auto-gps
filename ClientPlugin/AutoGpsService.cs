@@ -26,9 +26,10 @@ namespace ClientPlugin;
 // background sizing accumulate silently, and a keypress publishes what was detected since the
 // last press - so an AFK script that never sends input never gets a single marker.
 //
-// Rolling memory between keypresses: only the N most recent detections are remembered
-// (Config.RememberedDetections, default 5; 0 = remember everything) - a long unattended
-// stretch can never flood the GPS list on the next press.
+// Marker cap between presses: one keypress creates at most Config.MaxMarkersPerPress NEW
+// markers (default 5, 0 = no limit) - the most recent ones; older pending candidates are
+// forgotten. Updating markers that already exist (re-detect, field merge, size upgrade) is
+// NOT limited - it adds no clutter. A long unattended stretch can never flood the GPS list.
 //
 // Sizing scans are centred on each detected deposit's OWN position (not the ship), so it works
 // correctly at any speed. Newly detected positions queue up and are sized one area per cycle.
@@ -42,6 +43,7 @@ public static class AutoGpsService
         public List<Vector3D> Members;
         public double OreRatio;
         public double IngotRatio;
+        public long Seq; // newest member's detection order (recency for the per-press cap)
     }
 
     private class PublishedEntry
@@ -65,9 +67,10 @@ public static class AutoGpsService
     private static readonly ConcurrentQueue<List<FoundOre>> s_scanResults = new ConcurrentQueue<List<FoundOre>>();
     private static volatile bool s_scanRunning;
 
-    // Sized detections waiting for the mark keypress (main-thread only). FIFO: the rolling
-    // memory limit drops the OLDEST entries when the queue grows past the configured count.
+    // Sized detections waiting for the mark keypress (main-thread only, FIFO - oldest first).
     private static readonly Queue<FoundOre> s_pending = new Queue<FoundOre>();
+    // Monotonic detection order, stamped onto queued FoundOre -> marker recency (per-press cap).
+    private static long s_seq;
     private static readonly Dictionary<string, List<PublishedEntry>> s_published = new Dictionary<string, List<PublishedEntry>>();
     private static readonly Dictionary<int, PublishedEntry> s_publishedByHash = new Dictionary<int, PublishedEntry>();
 
@@ -99,9 +102,6 @@ public static class AutoGpsService
         var session = MySession.Static;
         if (session == null) return;
         double now = session.ElapsedPlayTime.TotalSeconds;
-
-        // Rolling memory between keypresses: forget the oldest detections beyond the limit.
-        TrimMemory();
 
         while (s_capture.TryDequeue(out var o))
             AddDetected(o.Material, o.Position);
@@ -191,15 +191,6 @@ public static class AutoGpsService
         catch { }
     }
 
-    // Enforces the rolling memory limit on both waiting queues (main-thread only).
-    private static void TrimMemory()
-    {
-        int limit = Math.Max(0, Config.Current.RememberedDetections);
-        if (limit <= 0) return; // 0 = remember everything
-        while (s_pendingSizing.Count > limit) s_pendingSizing.Dequeue();
-        while (s_pending.Count > limit) s_pending.Dequeue();
-    }
-
     // Records a detection (legit gate) and queues it for sizing if it is new.
     private static void AddDetected(string material, Vector3D pos)
     {
@@ -218,6 +209,7 @@ public static class AutoGpsService
 
     private static void AddPending(FoundOre o)
     {
+        o.Seq = ++s_seq; // detection order -> marker recency for the per-press cap
         s_pending.Enqueue(o);
     }
 
@@ -238,6 +230,7 @@ public static class AutoGpsService
         int dedup = Math.Max(1, cfg.DedupRadiusMeters);
         long minorM3 = Math.Max(0, cfg.MinorThreshold);
         int fieldRadius = Math.Max(1, cfg.FieldRadius);
+        int markerLimit = Math.Max(0, cfg.MaxMarkersPerPress);
 
         // Drain what is waiting (oldest first) and group it by material.
         var byMaterial = new Dictionary<string, List<FoundOre>>();
@@ -249,17 +242,19 @@ public static class AutoGpsService
             list.Add(o);
         }
 
+        // Cluster into would-be MARKERS (one notable deposit, or one field of small ones),
+        // keeping the legit gate. The cap below therefore counts real markers, not raw
+        // detections - wide deposits spanning many cells are still exactly one marker.
+        var candidates = new List<Candidate>();
         foreach (var kv in byMaterial)
         {
             string material = kv.Key;
             var points = kv.Value;
             if (!IsOreEnabled(material, cfg)) { skipped += points.Count; continue; }
 
-            var deposits = ClusterComponents(points, dedup);
-
             var notable = new List<Component>();
             var minor = new List<Component>();
-            foreach (var d in deposits)
+            foreach (var d in ClusterComponents(points, dedup))
             {
                 // Legit gate: only keep deposits the detector actually found.
                 if (!IsDetected(material, d.Position, d.SpatialRadius, dedup)) { skipped++; continue; }
@@ -267,29 +262,76 @@ public static class AutoGpsService
                 if (minorM3 <= 0 || m3 >= minorM3) notable.Add(d); else minor.Add(d);
             }
 
-            if (notable.Count == 0 && minor.Count == 0) continue;
-
-            if (!s_published.TryGetValue(material, out var published))
-            { published = new List<PublishedEntry>(); s_published[material] = published; }
-
             foreach (var d in notable)
-                HandleComponent(gps, identityId, material, d, false, published, cfg, ref added, ref updated, ref skipped);
+                candidates.Add(new Candidate { Material = material, Comp = d, IsField = false, FieldCount = 1, Seq = d.Seq });
 
             if (minor.Count > 0 && minorM3 > 0)
             {
                 var minorPoints = new List<FoundOre>(minor.Count);
                 foreach (var m in minor)
-                    minorPoints.Add(new FoundOre { Material = material, Position = m.Position, SolidVoxels = m.SolidVoxels, SpatialRadius = m.SpatialRadius });
+                    minorPoints.Add(new FoundOre { Material = material, Position = m.Position, SolidVoxels = m.SolidVoxels, SpatialRadius = m.SpatialRadius, Seq = m.Seq });
                 foreach (var f in ClusterComponents(minorPoints, fieldRadius))
                 {
                     bool anyDetected = f.Members != null && f.Members.Count > 0 &&
                         f.Members.Exists(mp => IsDetected(material, mp, 0, dedup));
                     if (!anyDetected) { skipped++; continue; }
                     int count = f.Members != null ? f.Members.Count : 1;
-                    HandleComponent(gps, identityId, material, f, true, published, cfg, ref added, ref updated, ref skipped, fieldCount: count);
+                    candidates.Add(new Candidate { Material = material, Comp = f, IsField = true, FieldCount = count, Seq = f.Seq });
                 }
             }
         }
+
+        // Marker cap: candidates that UPDATE an existing marker are never limited (no new
+        // clutter); a press creates at most 'markerLimit' NEW markers - the most recent ones.
+        var updateBatch = new List<Candidate>();
+        var newBatch = new List<Candidate>();
+        foreach (var c in candidates)
+        {
+            if (FindMatch(PublishedFor(c.Material), c.Comp, c.IsField, dedup, fieldRadius) != null) updateBatch.Add(c);
+            else newBatch.Add(c);
+        }
+        if (markerLimit > 0 && newBatch.Count > markerLimit)
+        {
+            newBatch.Sort((a, b) => b.Seq.CompareTo(a.Seq)); // newest first
+            skipped += newBatch.Count - markerLimit;
+            newBatch.RemoveRange(markerLimit, newBatch.Count - markerLimit);
+        }
+
+        foreach (var c in updateBatch)
+            HandleComponent(gps, identityId, c.Material, c.Comp, c.IsField, PublishedFor(c.Material), cfg, ref added, ref updated, ref skipped, fieldCount: c.FieldCount);
+        foreach (var c in newBatch)
+            HandleComponent(gps, identityId, c.Material, c.Comp, c.IsField, PublishedFor(c.Material), cfg, ref added, ref updated, ref skipped, fieldCount: c.FieldCount);
+    }
+
+    // One would-be marker for the per-press cap: a notable deposit or a field of small ones.
+    private struct Candidate
+    {
+        public string Material;
+        public Component Comp;
+        public bool IsField;
+        public int FieldCount;
+        public long Seq; // recency: newest member's detection order
+    }
+
+    // The published-marker list for a material (created on first use).
+    private static List<PublishedEntry> PublishedFor(string material)
+    {
+        if (!s_published.TryGetValue(material, out var list))
+        { list = new List<PublishedEntry>(); s_published[material] = list; }
+        return list;
+    }
+
+    // The published marker this component belongs to, if any (fields match fields,
+    // notables match notables - same rule HandleComponent applies when publishing).
+    private static PublishedEntry FindMatch(List<PublishedEntry> published, Component comp, bool isField, int dedup, int fieldRadius)
+    {
+        foreach (var entry in published)
+        {
+            if (entry.IsField != isField) continue;
+            double reach = (isField ? fieldRadius : dedup) + entry.SpatialRadius;
+            if (Vector3D.DistanceSquared(entry.Position, comp.Position) <= reach * reach) return entry;
+        }
+        return null;
     }
 
     // True if the detector reported this material near the given position.
@@ -308,13 +350,7 @@ public static class AutoGpsService
         int dedup = Math.Max(1, cfg.DedupRadiusMeters);
         int fieldRadius = Math.Max(1, cfg.FieldRadius);
 
-        PublishedEntry match = null;
-        foreach (var entry in published)
-        {
-            if (entry.IsField != isField) continue; // fields accumulate with fields; notables with notables
-            double reach = (isField ? fieldRadius : dedup) + entry.SpatialRadius;
-            if (Vector3D.DistanceSquared(entry.Position, comp.Position) <= reach * reach) { match = entry; break; }
-        }
+        PublishedEntry match = FindMatch(published, comp, isField, dedup, fieldRadius);
 
         if (match == null)
         {
@@ -450,18 +486,19 @@ public static class AutoGpsService
         }
         foreach (var g in groups.Values)
         {
-            double totalW = 0; Vector3D center = Vector3D.Zero; int totalSolid = 0;
+            double totalW = 0; Vector3D center = Vector3D.Zero; int totalSolid = 0; long seq = 0;
             var members = new List<Vector3D>(g.Count);
             foreach (int idx in g)
             {
                 int w = points[idx].SolidVoxels > 0 ? points[idx].SolidVoxels : 1;
                 center += points[idx].Position * w; totalW += w; totalSolid += points[idx].SolidVoxels;
+                if (points[idx].Seq > seq) seq = points[idx].Seq;
                 members.Add(points[idx].Position);
             }
             if (totalW > 0) center /= totalW;
             double maxDistSq = 0;
             foreach (int idx in g) { double d = Vector3D.DistanceSquared(center, points[idx].Position); if (d > maxDistSq) maxDistSq = d; }
-            result.Add(new Component { Position = center, SolidVoxels = totalSolid, SpatialRadius = Math.Sqrt(maxDistSq), Members = members, OreRatio = points.Count > 0 ? points[0].OreRatio : 0, IngotRatio = points.Count > 0 ? points[0].IngotRatio : 0 });
+            result.Add(new Component { Position = center, SolidVoxels = totalSolid, SpatialRadius = Math.Sqrt(maxDistSq), Members = members, OreRatio = points.Count > 0 ? points[0].OreRatio : 0, IngotRatio = points.Count > 0 ? points[0].IngotRatio : 0, Seq = seq });
         }
         return result;
     }

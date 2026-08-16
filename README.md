@@ -25,9 +25,10 @@ the ore detector never tells you which voxel variant a deposit is (dense ice vs 
 
 - **Keybind-gated** — detection and background sizing accumulate silently; a keypress marks
   what was found since the last press. No keypress, no markers — ever.
-- **Bounded memory between presses** — while waiting for the keypress the plugin remembers only
-  the *N* most recent detections (default 5, configurable; 0 = remember everything). Older
-  detections are forgotten, so a long unattended stretch never floods your GPS list.
+- **Bounded markers per press** — one keypress creates at most *N* new markers (default 5,
+  configurable 0–5; 0 = no limit) — the most recent deposits; older pending ones are forgotten.
+  A wide deposit or a whole field of small deposits counts as **one** marker, and updating
+  markers that already exist (re-detect, merge, size upgrade) is never limited.
 - **Correct sizing & centering** — each deposit is measured at its own world position, so it works
   at any ship speed. One deposit = one waypoint at its mass-weighted center, with the true total
   size — no matter how wide the deposit is.
@@ -63,8 +64,8 @@ Search for **"Ore to Auto Gps"** in Pulsar's plugin list and enable it. *(Not pu
 Open the plugin's config dialog from Pulsar's plugin list. The headline option is the **Mark
 detected ore** keybind (Player interaction section; default Alt+K). Press it in-game to create
 markers for everything detected since the last press — it is ignored while you are typing in
-chat or a text field. Next to it, **Remembered detections** caps how many of the most recent
-detections are kept while waiting for the keypress (default 5; 0 = remember everything).
+chat or a text field. Next to it, **Max markers per press** caps how many new markers one
+keypress creates (default 5; 0 = no limit; updates to existing markers are not capped).
 Other options: marker spacing, size toggle, HUD visibility, coordinates in the name,
 small-deposit clustering (clutter control), and per-ore toggles (Iron, Nickel, Cobalt, Magnesium,
 Silicon, Silver, Gold, Platinum, Uranium, Ice, Stone). A **Clear all** button removes every GPS

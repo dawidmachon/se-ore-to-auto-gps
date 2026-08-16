@@ -18,6 +18,7 @@ public struct FoundOre
     public Vector3D Position;
     public int SolidVoxels; // LOD-2 solid sample count; x64 ~= m^3
     public double SpatialRadius; // actual extent from centroid; set by clustering
+    public long Seq;             // detection order, stamped by AutoGpsService.AddPending (marker recency); 0 until then
     public double OreRatio;   // BASELINE ore kg per deposit m^3 - variant-agnostic (0.009 x server harvest x baseline MinedOreRatio x ore density); 0 if unknown
     public double IngotRatio; // BASELINE ingot kg per deposit m^3 (ore kg x blueprint mass ratio); 0 if not refinable
 }

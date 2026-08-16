@@ -1,4 +1,4 @@
-Ore to Auto Gps - internal test build v1.1.0
+Ore to Auto Gps - internal test build v1.2.0
 =============================================
 
 This archive is password-protected (AES-256). Extract it with 7-Zip or
@@ -11,9 +11,11 @@ scans for or reveals ore the detector did not find; the background voxel
 read only measures the size of already-detected deposits.
 
 This build adds (vs. the previous test round):
-  - default mark key Alt+K (rebindable in plugin settings),
-  - a rolling memory between keypresses (only the N most recent
-    detections are remembered, default 5; 0 = remember everything),
+  - the mark key now ships bound to Alt+K (rebindable in plugin settings),
+  - a marker cap per press: at most N NEW markers per keypress, the most
+    recent deposits (default 5, slider 0-5; 0 = no limit). A wide deposit
+    or a whole field of small deposits counts as ONE marker; updating
+    existing markers is never limited,
   - yield figures computed from a BASELINE yield per ore (all ice is
     sized as regular ice, all stone as regular stone) - the detector
     cannot tell dense/snow variants apart, so the numbers must not either.
@@ -48,13 +50,18 @@ b) Chat safety:
    Open chat (or any text field), press Alt+K there: NOTHING may happen
    (no markers, no toast spam). The key only works in normal gameplay.
 
-c) Rolling memory (the new setting):
-   In the plugin settings set "Remembered detections" to 2. Fly past
+c) Marker cap (the new setting):
+   In the plugin settings set "Max markers per press" to 2. Fly past
    several DIFFERENT deposits one after another without pressing, then
-   press Alt+K: only roughly the last 2 detections should get markers -
-   the older ones were forgotten (a HUD toast still reports the count).
-   Then set it to 0, fly past several again and press: everything found
-   since the last press gets marked (0 = remember everything).
+   press Alt+K: AT MOST 2 new markers appear - the 2 most recent
+   deposits; the older ones were forgotten (the HUD toast reports how
+   many were actually added). Then set it to 0, find more ore and press
+   again: every deposit found since the last press gets marked
+   (0 = no limit).
+   Also check the cap counts MARKERS, not detections: fly slowly along
+   one LARGE deposit (the detector beeps/queues many times along it)
+   with the cap at 1, then press: you get ONE marker for that deposit,
+   not a flood.
 
 d) Incremental presses:
    Detect some ore, press Alt+K (markers appear). Detect MORE ore, press
@@ -78,7 +85,7 @@ f) Old features still working:
 
 3. Settings (defaults after install)
 -----------------------------------
-Mark key: Alt+K. Remembered detections: 5. Dedup radius: 100 m.
+Mark key: Alt+K. Max markers per press: 5. Dedup radius: 100 m.
 Show quantity: on. Show on HUD: on. Minor threshold: 1000 m^3.
 Field radius: 500 m. All ores on except Stone. Modded ores: on.
 

@@ -19,9 +19,8 @@ public class Config : INotifyPropertyChanged
     // nothing is ever marked (player-interaction gate) + a one-time toast points here.
     private Binding markKey = new Binding(MyKeys.K, alt: true);
 
-    // Rolling memory between keypresses: only the N most recent detections are remembered;
-    // older ones are forgotten and never marked. 0 = remember everything.
-    private int rememberedDetections = 5;
+    // At most this many NEW markers per mark-key press (the most recent ones); 0 = no limit.
+    private int maxMarkersPerPress = 5;
 
     private int dedupRadiusMeters = 100;
     private bool showQuantity = true;
@@ -59,11 +58,11 @@ public class Config : INotifyPropertyChanged
         set => SetField(ref markKey, value);
     }
 
-    [Slider(0f, 100f, 1f, SliderAttribute.SliderType.Integer, description: "How many of the most recent detections are remembered while waiting for the mark key. Older detections are forgotten and never marked. 0 = remember everything.")]
-    public int RememberedDetections
+    [Slider(0f, 5f, 1f, SliderAttribute.SliderType.Integer, description: "At most this many NEW GPS markers are created when you press the mark key - the most recent deposits; older pending ones are forgotten. Updating existing markers is not limited. 0 = no limit.")]
+    public int MaxMarkersPerPress
     {
-        get => rememberedDetections;
-        set => SetField(ref rememberedDetections, value);
+        get => maxMarkersPerPress;
+        set => SetField(ref maxMarkersPerPress, value);
     }
 
     [Separator("Markers")]
