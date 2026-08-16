@@ -2,19 +2,38 @@
 setlocal enabledelayedexpansion
 
 REM ============================================================
-REM  Builds a test package (zip) for internal testers from the
-REM  already-built plugin outputs. Usage:
+REM  Generic tester-package builder for SE1 Pulsar client
+REM  plugins. Part of the se-plugin-ship skill tooling - copy
+REM  into the PROJECT ROOT; it adapts itself to the project.
+REM
+REM  Usage (from the project root, after dotnet build):
 REM
 REM    MakeTestPackage.bat [Debug^|Release] [plugin-name]
 REM
-REM  Requires the solution to be built first (dotnet build).
-REM  Output: dist\<name>-<version>-test.zip
+REM  The plugin name is auto-detected from ^<AssemblyName^> in
+REM  ClientPlugin\*.csproj when not given as the 2nd argument.
+REM  Output: dist\<name>-<version>-test.zip (AES-256, password
+REM  printed and saved to dist\<zip>.password.txt).
+REM
+REM  Also stages and VERIFIES the packaging scripts from
+REM  Package\ (Install/Uninstall/Diagnostics must exist there;
+REM  README-test.txt is the per-plugin test plan). The runtime
+REM  guard below refuses to pack a DLL whose target framework
+REM  does not match its Pulsar edition folder.
 REM ============================================================
 
 set "CONFIG=%~1"
 if "%CONFIG%"=="" set "CONFIG=Debug"
 set "NAME=%~2"
-if "%NAME%"=="" set "NAME=OreToAutoGps"
+
+if not defined NAME (
+    for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "(Select-Xml -Path 'ClientPlugin\*.csproj' -XPath '//AssemblyName' -ErrorAction SilentlyContinue | Select-Object -First 1).Node.InnerText"`) do set "NAME=%%A"
+)
+if not defined NAME (
+    echo ERROR: plugin name not given and no ^<AssemblyName^> found in ClientPlugin\*.csproj.
+    echo Usage: MakeTestPackage.bat [Debug^|Release] [plugin-name]
+    exit /b 1
+)
 
 REM read <Version> from Version.Build.props
 set "VER="
@@ -44,6 +63,13 @@ if not exist "%NAME%.xml" (
     echo ERROR: %NAME%.xml descriptor not found in the repo root.
     exit /b 1
 )
+for %%S in (Install-TestPlugin.bat Uninstall-TestPlugin.bat Diagnostics.bat) do (
+    if not exist "Package\%%S" (
+        echo ERROR: Package\%%S not found.
+        echo Copy the generic packaging scripts from the se-plugin-ship skill ^(tools/^) into Package\ first.
+        exit /b 1
+    )
+)
 
 set "SEVENZIP=%ProgramFiles%\7-Zip\7z.exe"
 if not exist "%SEVENZIP%" (
@@ -59,8 +85,8 @@ echo Staging %NAME% v%VER% (%CONFIG%)...
 
 copy /y "Package\Install-TestPlugin.bat" "%STAGE%\" >nul
 copy /y "Package\Uninstall-TestPlugin.bat" "%STAGE%\" >nul
-copy /y "Package\README-test.txt" "%STAGE%\" >nul
-if exist "Package\Diagnostics.bat" copy /y "Package\Diagnostics.bat" "%STAGE%\" >nul
+copy /y "Package\Diagnostics.bat" "%STAGE%\" >nul
+if exist "Package\README-test.txt" copy /y "Package\README-test.txt" "%STAGE%\" >nul
 
 REM net48 build -> Pulsar Legacy, net10.0 build -> Pulsar Interim
 copy /y "ClientPlugin\bin\%CONFIG%\net48\%NAME%.dll" "%STAGE%\Plugin\Legacy\" >nul
