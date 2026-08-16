@@ -7,6 +7,16 @@ Design constraints (do not break these):
 - **Legit gate:** only ore the detector has already detected may be marked. The background voxel
   read is used purely to SIZE already-detected deposits; any ore the detector did not find is
   discarded in `Publish` (see `IsDetected`). Never reveal undetected ore.
+- **Player-interaction gate (PluginHub requirement):** GPS markers are created ONLY when the player
+  presses the configured key (`Config.MarkKey`, polled via `Binding.HasPressed` in
+  `AutoGpsService.HandleMarkInput` - the single publish path). Detection and background sizing
+  accumulate without input, but no keypress means no marker ever (anti-AFK). Key ships unbound;
+  the plugin toasts once to point at the setting. Keypresses are ignored while a GUI control has
+  keyboard focus (chat / text fields).
+- **Vanilla-information limit (PluginHub requirement):** size figures must not expose more than
+  vanilla knows. Rough sizes are fine, but yields are computed from a **baseline variant per ORE**
+  (`VoxelScan.BaselineYield`: `<Ore>_01`, else ore-named material, else richest variant) - never
+  from the actual voxel variant (the detector cannot tell Snow from Ice, Triton stone from Stone).
 - No publicizer. Mode 1 is a manual Harmony target on the internal `MyOreDepositGroup.OnDepositQueryComplete`
   (resolved by name in `Plugin.Init`). Sizing uses public voxel APIs (`IMyStorage.ReadRange`,
   `MyStorageData`, `MyVoxelCoordSystems`, `MyDefinitionManager.GetVoxelMaterialDefinition`).

@@ -18,8 +18,8 @@ public struct FoundOre
     public Vector3D Position;
     public int SolidVoxels; // LOD-2 solid sample count; x64 ~= m^3
     public double SpatialRadius; // actual extent from centroid; set by clustering
-    public double OreRatio;   // ore kg per deposit m^3 (0.009 x server harvest x MinedOreRatio x ore density); 0 if unknown
-    public double IngotRatio; // ingot kg per deposit m^3 (ore kg x blueprint mass ratio); 0 if not refinable
+    public double OreRatio;   // BASELINE ore kg per deposit m^3 - variant-agnostic (0.009 x server harvest x baseline MinedOreRatio x ore density); 0 if unknown
+    public double IngotRatio; // BASELINE ingot kg per deposit m^3 (ore kg x blueprint mass ratio); 0 if not refinable
 }
 
 // Mode 2 engine: a first-party voxel scan that replicates the ore detector's LOD-2
@@ -31,9 +31,13 @@ public static class VoxelScan
     private const int Lod = 2;
     private const int CellShift = 5; // 32 LOD-0 voxels per cell axis (CELL_SIZE_IN_METERS)
 
-    // Per-material-byte yield (session-stable; populated lazily - scans run one at a time).
-    private static readonly Dictionary<int, double> s_yieldOre = new Dictionary<int, double>();
-    private static readonly Dictionary<int, double> s_yieldIngot = new Dictionary<int, double>();
+    // Per-ORE baseline yield (session-stable; populated lazily - scans run one at a time).
+    // Keyed by ore NAME, never by voxel material byte: the ore detector only ever reports the
+    // ore ("Ice", "Stone"), not the voxel variant (Ice_01 vs Snow, Stone_01 vs TritonStone...),
+    // so the yield figures must not depend on the variant the scan found (PluginHub:
+    // limit info to what vanilla exposes).
+    private static readonly Dictionary<string, double> s_yieldOre = new Dictionary<string, double>();
+    private static readonly Dictionary<string, double> s_yieldIngot = new Dictionary<string, double>();
 
     public static void Run(Vector3D center, double radius, Action<List<FoundOre>> onComplete)
     {
@@ -147,7 +151,10 @@ public static class VoxelScan
                 var def = MyDefinitionManager.Static.GetVoxelMaterialDefinition((byte)m);
                 if (def == null || !def.IsRare) continue;
 
-                if (!s_yieldOre.ContainsKey(m)) { ComputeYield(def, out var oRatio, out var iRatio); s_yieldOre[m] = oRatio; s_yieldIngot[m] = iRatio; }
+                string material = !string.IsNullOrEmpty(def.MinedOre) ? def.MinedOre : def.Id.SubtypeName;
+                if (string.IsNullOrEmpty(material)) continue;
+
+                if (!s_yieldOre.ContainsKey(material)) { BaselineYield(material, out var oRatio, out var iRatio); s_yieldOre[material] = oRatio; s_yieldIngot[material] = iRatio; }
 
                 // Same world-position pipeline as MyDepositQuery -> MyEntityOreDeposit.
                 Vector3 avg = sum[m] / c;
@@ -158,15 +165,40 @@ public static class VoxelScan
                 // Cell bounds are a box; keep only points inside the requested sphere.
                 if (Vector3D.DistanceSquared(center, world) > radiusSq) continue;
 
-                string material = !string.IsNullOrEmpty(def.MinedOre) ? def.MinedOre : def.Id.SubtypeName;
-                if (string.IsNullOrEmpty(material)) continue;
-
-                result.Add(new FoundOre { Material = material, Position = world, SolidVoxels = c, OreRatio = s_yieldOre[m], IngotRatio = s_yieldIngot[m] });
+                result.Add(new FoundOre { Material = material, Position = world, SolidVoxels = c, OreRatio = s_yieldOre[material], IngotRatio = s_yieldIngot[material] });
             }
 
             Array.Clear(sum, 0, sum.Length);
             Array.Clear(count, 0, count.Length);
         }
+    }
+
+    // BASELINE (variant-agnostic) yield for an ore, used for every voxel of that ore no matter
+    // which variant it is. The baseline variant is the ore's standard "<Ore>_01" material when
+    // it exists (Iron_01, Ice_01, ...), else the material named after the ore itself (planetary
+    // "Ice"/"Stone"), else the richest variant (modded ores). Never the actual scanned variant:
+    // the detector cannot distinguish variants, so neither may the figures.
+    private static void BaselineYield(string oreName, out double oreRatio, out double ingotRatio)
+    {
+        oreRatio = 0; ingotRatio = 0;
+        MyVoxelMaterialDefinition baseline = null;
+        try
+        {
+            string preferred = oreName + "_01";
+            MyVoxelMaterialDefinition named = null, richest = null;
+            double richestRatio = 0;
+            foreach (var def in MyDefinitionManager.Static.GetVoxelMaterialDefinitions())
+            {
+                if (def == null || def.MinedOre != oreName) continue;
+                string sub = def.Id.SubtypeName;
+                if (sub == preferred) { named = def; break; }   // rule 1: <Ore>_01
+                if (named == null && sub == oreName) named = def; // rule 2: named after the ore
+                if (def.MinedOreRatio > richestRatio) { richestRatio = def.MinedOreRatio; richest = def; } // rule 3
+            }
+            baseline = named ?? richest;
+        }
+        catch { }
+        ComputeYield(baseline, out oreRatio, out ingotRatio);
     }
 
     // ore kg and ingot kg per deposit m^3 (1 voxel = 1 m^3), from the game's own definitions.

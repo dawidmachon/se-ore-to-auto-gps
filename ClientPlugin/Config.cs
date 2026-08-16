@@ -14,6 +14,10 @@ public class Config : INotifyPropertyChanged
 {
     #region Options
 
+    // Unassigned by default: every letter is bound in vanilla, so the player picks a free key.
+    // Nothing is ever marked while this is unbound (player-interaction gate).
+    private Binding markKey = new Binding();
+
     private int dedupRadiusMeters = 100;
     private bool showQuantity = true;
     private bool showOnHud = true;
@@ -41,6 +45,14 @@ public class Config : INotifyPropertyChanged
     #region User interface
 
     public readonly string Title = "Ore to Auto Gps";
+
+    [Separator("Player interaction")]
+    [Keybind(label: "Mark detected ore", description: "Press this key in-game to create GPS markers for everything your ore detector has detected so far. Nothing is ever marked without this keypress.")]
+    public Binding MarkKey
+    {
+        get => markKey;
+        set => SetField(ref markKey, value);
+    }
 
     [Separator("Markers")]
     [Slider(20f, 1000f, 10f, SliderAttribute.SliderType.Integer, description: "Link distance (m) that joins ore cells into one deposit and recognises the same deposit across scans.")]

@@ -3,6 +3,29 @@
 Reference for the `~X kg ore -> ~Y kg ingots @100%` GPS figures: the maths, where every factor
 comes from in the game files, and the quirks. So this can be understood, validated, and tuned later.
 
+## Baseline yield (PluginHub: vanilla-information limit)
+
+The ore detector only ever reports the **ore** ("Ice", "Stone"), never the **voxel variant** —
+and variants of one ore yield very different amounts per voxel:
+
+| Ore | Standard variant | `MinedOreRatio` | Other variants | Their ratios |
+|---|---|---|---|---|
+| Ice | `Ice_01` | 5 | `Snow` / `AlienSnow` | **1** |
+| Stone | `Stone_01` | 5 | `Grass`/`Soil`, `TritonStone` | **1–2, 6** |
+| (modded) | `X_01` if present | — | anything | — |
+
+Sizing a deposit with its *actual* variant would therefore disclose information vanilla does not
+expose ("this ice is dense ice"). The plugin instead uses **one baseline yield per ore**
+(`VoxelScan.BaselineYield`): every voxel of an ore is converted with the same baseline variant,
+picked as:
+
+1. the ore's standard `<Ore>_01` material if it exists (`Iron_01`, `Ice_01`, …);
+2. else the material named exactly after the ore (planetary `Ice`, `Stone`);
+3. else the richest variant (single-variant modded ores resolve to themselves).
+
+So the figures stay **rough**, exactly like the detector's own information: same voxel count,
+same ore — one conversion, variant-agnostic.
+
 ## Formula
 
 For a scanned deposit of `V` solid ore voxels (≈ `V` m³, since 1 voxel = 1 m³):
@@ -22,7 +45,7 @@ unknown for a "potential" figure, so a **default drill (×1)** is assumed.
 |---|---|---|---|
 | base harvest `0.009` | `Sandbox.Game` → `MyDrillBase.cs` (`VoxelHarvestRatio = 0.009f`) | hardcoded constant | 0.009 |
 | server harvest × | `MySession.Static.Settings.HarvestRatioMultiplier` | live, per server | 1.0 default |
-| `MinedOreRatio` | `Content/Data/VoxelMaterials_asteroids.sbc` (per material) | `MyVoxelMaterialDefinition.MinedOreRatio` | 3 (`Silicon_01`) |
+| `MinedOreRatio` | `Content/Data/VoxelMaterials_asteroids.sbc` (per material) | `MyVoxelMaterialDefinition.MinedOreRatio` | 3 (`Silicon_01`) — **baseline variant only**, see above |
 | ore density kg/m³ | `Content/Data/PhysicalItems.sbc` → `Mass / Volume` | `GetPhysicalItemDefinition(id).Mass / .Volume` | 1 / 0.00037 = **2703** |
 | blueprint ratio | `Content/Data/Blueprints.sbc` → `Result.Amount / Prerequisites.Amount` | `GetBlueprintDefinitions()` (match `InputItemType == MyObjectBuilder_Ore`) | 0.7 / 1.0 = **0.7** |
 
@@ -56,7 +79,9 @@ Based on **ore kg** (see `SizeWord` in the service). Tunable:
 
 ## Precision
 
-The formula and all factors are exact (from the game's definitions). The only approximation is the
-**voxel volume estimate** (`V`), derived from an LOD-2 solid-sample count (the same method the
-game's own ore detector uses). If a fully-mined node's GPS figure disagrees with reality, the gap
-is in `V`, not the conversion.
+The conversion factors are exact (from the game's definitions) but, by design, applied to a
+**baseline** variant per ore — not the actual scanned variant — so the result is an intentionally
+rough estimate at vanilla's information level. The remaining approximation is the **voxel volume
+estimate** (`V`), derived from an LOD-2 solid-sample count (the same method the game's own ore
+detector uses). If a fully-mined node's GPS figure disagrees with reality, the gap is in `V`, the
+baseline choice, or a non-`_01` variant — not the conversion maths.

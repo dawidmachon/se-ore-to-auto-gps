@@ -3,10 +3,13 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using Sandbox.Game;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.World;
+using Sandbox.Graphics.GUI;
 using VRage;
 using VRage.Game.ModAPI;
+using VRage.Input;
 using VRage.Utils;
 using VRage.Voxels;
 using VRageMath;
@@ -16,7 +19,12 @@ namespace ClientPlugin;
 // Legit auto-marker: it ONLY marks ore the player's ore detector has actually detected.
 // A background voxel read measures the size/extent of those already-detected deposits
 // (and groups nearby small ones) - any ore the detector has not found is discarded and never
-// marked. Markers appear automatically as the detector scans; no keybind.
+// marked.
+//
+// Player-interaction gate (PluginHub requirement): markers are created ONLY when the player
+// presses the configured key (settings -> "Mark detected ore"). Detection and background
+// sizing accumulate silently, and one keypress publishes everything the detector has found so
+// far - so an AFK script that never sends input never gets a single marker.
 //
 // Sizing scans are centred on each detected deposit's OWN position (not the ship), so it works
 // correctly at any speed. Newly detected positions queue up and are sized one area per cycle.
@@ -61,6 +69,9 @@ public static class AutoGpsService
     private const double SizingRadius = 350.0;
     private static double s_nextSizingSeconds;
 
+    // One-time reminder that no mark key is bound (the gate cannot work without it).
+    private static bool s_warnedNoKey;
+
     private static readonly Dictionary<string, Color> s_colors = new Dictionary<string, Color>
     {
         { "Iron",      new Color(190, 190, 190) },
@@ -85,14 +96,16 @@ public static class AutoGpsService
         while (s_capture.TryDequeue(out var o))
             AddDetected(o.Material, o.Position);
 
-        // A sizing scan just completed -> publish ONLY deposits the detector detected.
+        // A sizing scan just completed -> accumulate. Publishing waits for the player's keypress
+        // (player-interaction gate); until then nothing touches the GPS list.
         if (s_scanResults.TryDequeue(out var results))
         {
             s_scanRunning = false;
             foreach (var o in results) AddPending(o);
-            int added, updated, skipped;
-            Publish(out added, out updated, out skipped);
         }
+
+        // Player-interaction gate: the only place GPS markers get created.
+        HandleMarkInput();
 
         // Size newly detected ore: scan around the deposit's own position (works at any speed).
         // One area per cycle, throttled, so a stream of detections is processed performantly.
@@ -130,6 +143,42 @@ public static class AutoGpsService
 
             s_capture.Enqueue(new FoundOre { Material = material, Position = world, SolidVoxels = 0, SpatialRadius = 0 });
         }
+    }
+
+    // Player-interaction gate (PluginHub requirement). Publishes accumulated, detector-verified
+    // deposits ONLY on the configured keypress, so ore can never be marked while AFK.
+    private static void HandleMarkInput()
+    {
+        var key = Config.Current.MarkKey;
+        if (key.Key == MyKeys.None)
+        {
+            // Without a key nothing can ever be marked - point the player at the setting once.
+            if (!s_warnedNoKey && s_detected.Count > 0)
+            {
+                s_warnedNoKey = true;
+                Notify("Ore to Auto Gps: ore detected - bind the 'Mark detected ore' key in the plugin settings to mark it.");
+            }
+            return;
+        }
+
+        var input = MyInput.Static;
+        if (input == null) return;
+        if (MyScreenManager.FocusedControl != null) return; // typing in chat / a text field
+
+        if (key.HasPressed(input))
+        {
+            Publish(out int added, out int updated, out int skipped);
+            if (added > 0 || updated > 0)
+                Notify("Ore to Auto Gps: " + added + " new, " + updated + " updated marker(s).");
+            else
+                Notify("Ore to Auto Gps: no detected ore waiting to be marked.");
+        }
+    }
+
+    private static void Notify(string message)
+    {
+        try { MyVisualScriptLogicProvider.ShowNotification(message, 5000); }
+        catch { }
     }
 
     // Records a detection (legit gate) and queues it for sizing if it is new.
@@ -500,7 +549,7 @@ public static class AutoGpsService
         while (s_capture.TryDequeue(out _)) { }
         while (s_scanResults.TryDequeue(out _)) { }
         s_detected.Clear(); s_pendingSizing.Clear(); s_pending.Clear(); s_published.Clear(); s_publishedByHash.Clear();
-        s_scanRunning = false; s_nextSizingSeconds = 0;
+        s_scanRunning = false; s_nextSizingSeconds = 0; s_warnedNoKey = false;
     }
 
     public static void Log(string msg) { try { MyLog.Default.WriteLine("[OreToAutoGps] " + msg); } catch { } }
