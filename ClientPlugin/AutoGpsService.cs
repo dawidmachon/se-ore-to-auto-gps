@@ -451,7 +451,7 @@ public static class AutoGpsService
             return;
         }
 
-        name = material;
+        name = "Detected Ore, " + material;
         if (cfg.ShowQuantity && comp.SolidVoxels > 0) name += " ~" + SizeWord(oreKg);
         if (cfg.IncludeCoordsInName) name += " " + coord;
         var sb = new StringBuilder();
