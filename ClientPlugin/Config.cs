@@ -15,9 +15,9 @@ public class Config : INotifyPropertyChanged
 {
     #region Options
 
-    // Alt+K by default (every plain letter is bound in vanilla); rebindable. Unbound =
+    // Alt+L by default (every plain letter is bound in vanilla); rebindable. Unbound =
     // nothing is ever marked (player-interaction gate) + a one-time toast points here.
-    private Binding markKey = new Binding(MyKeys.K, alt: true);
+    private Binding markKey = new Binding(MyKeys.L, alt: true);
 
     // At most this many NEW markers per mark-key press (the most recent ones); 0 = no limit.
     private int maxMarkersPerPress = 5;
@@ -51,7 +51,7 @@ public class Config : INotifyPropertyChanged
     public readonly string Title = "Ore to Auto Gps";
 
     [Separator("Player interaction")]
-    [Keybind(label: "Mark detected ore", description: "Press this key in-game to create GPS markers for everything your ore detector has detected since the last press. Nothing is ever marked without this keypress. Default: Alt+K.")]
+    [Keybind(label: "Mark detected ore", description: "Press this key in-game to create GPS markers for everything your ore detector has detected since the last press. Nothing is ever marked without this keypress. Default: Alt+L.")]
     public Binding MarkKey
     {
         get => markKey;

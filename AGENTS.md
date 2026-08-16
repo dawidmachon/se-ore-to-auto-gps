@@ -8,7 +8,7 @@ Design constraints (do not break these):
   read is used purely to SIZE already-detected deposits; any ore the detector did not find is
   discarded in `Publish` (see `IsDetected`). Never reveal undetected ore.
 - **Player-interaction gate (PluginHub requirement):** GPS markers are created ONLY when the player
-  presses the configured key (`Config.MarkKey`, default Alt+K, polled via `Binding.HasPressed` in
+  presses the configured key (`Config.MarkKey`, default Alt+L, polled via `Binding.HasPressed` in
   `AutoGpsService.HandleMarkInput` - the single publish path). Detection and background sizing
   accumulate without input, but no keypress means no marker ever (anti-AFK). If the key is unbound
   the plugin toasts once to point at the setting. Keypresses are ignored while a GUI control has

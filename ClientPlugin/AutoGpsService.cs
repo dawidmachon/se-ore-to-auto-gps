@@ -22,7 +22,7 @@ namespace ClientPlugin;
 // marked.
 //
 // Player-interaction gate (PluginHub requirement): markers are created ONLY when the player
-// presses the configured key (settings -> "Mark detected ore", default Alt+K). Detection and
+// presses the configured key (settings -> "Mark detected ore", default Alt+L). Detection and
 // background sizing accumulate silently, and a keypress publishes what was detected since the
 // last press - so an AFK script that never sends input never gets a single marker.
 //

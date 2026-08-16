@@ -5,7 +5,7 @@ ore your ore detector detects as GPS waypoints — **but only when you press you
 with an approximate deposit size measured in the background. The keypress is a fairness gate:
 nothing is ever created automatically, so ore can never be marked while AFK.
 
-> **First run:** the mark key ships bound to **Alt+K** (all plain letters are taken by vanilla).
+> **First run:** the mark key ships bound to **Alt+L** (all plain letters are taken by vanilla).
 > Rebind it in the plugin settings — *Player interaction → Mark detected ore* — then press it
 > in-game to mark everything detected since the last press. If you unbind it, nothing can ever
 > be marked.
@@ -62,7 +62,7 @@ Search for **"Ore to Auto Gps"** in Pulsar's plugin list and enable it. *(Not pu
 ## Configuration
 
 Open the plugin's config dialog from Pulsar's plugin list. The headline option is the **Mark
-detected ore** keybind (Player interaction section; default Alt+K). Press it in-game to create
+detected ore** keybind (Player interaction section; default Alt+L). Press it in-game to create
 markers for everything detected since the last press — it is ignored while you are typing in
 chat or a text field. Next to it, **Max markers per press** caps how many new markers one
 keypress creates (default 5; 0 = no limit; updates to existing markers are not capped).
