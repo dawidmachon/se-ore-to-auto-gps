@@ -91,8 +91,22 @@ Field radius: 500 m. All ores on except Stone. Modded ores: on.
 
 4. If something does not work
 -----------------------------
-Send back the newest file:
-    %AppData%\SpaceEngineers\SpaceEngineers.log
+If the plugin shows a warning (e.g. "Host!" / "runtime!") in Pulsar's
+plugin list and does not load:
+  - Pulsar writes NOTHING to its log for this case - it silently skips
+    the plugin. Run Diagnostics.bat (shipped in this package), then send
+    back the Diagnostics-report.txt it creates (it also lands on your
+    Desktop). It records which Pulsar edition you run, which build of
+    the plugin got installed there, whether it is enabled, and your
+    installed .NET runtimes.
+  - Common causes it detects: the plugin's .NET Framework build sitting
+    in Pulsar Interim (or the .NET 10 build in Pulsar Legacy), or an
+    outdated Interim/Modern. Note: Pulsar "Modern" is the Space
+    Engineers 2 loader - SE1 plugins never go there (the installer
+    skips it on purpose).
+
+For any other problem, send back the newest file:
+    %AppData%\SpaceEngineers\SpaceEngineers*.log
 Everything the plugin logs starts with [OreToAutoGps]. Also note what
 you did (which test letter above) and what happened instead.
 

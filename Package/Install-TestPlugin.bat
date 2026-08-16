@@ -21,7 +21,6 @@ echo.
 echo === SE test plugin installer ===
 echo Pulsar folder: %PULSAR%
 echo.
-
 if not exist "%PULSAR%" (
     echo ERROR: Pulsar folder not found.
     echo Install Pulsar first, or pass its folder as argument:
@@ -56,9 +55,14 @@ echo.
 if "%INSTALLED%"=="0" (
     echo WARNING: no Pulsar edition was found ^(no Profiles\Current.xml^).
     echo Is Pulsar installed and started at least once?
+    if exist "%PULSAR%\Modern" (
+        echo NOTE: only Pulsar Modern was found - that is the Space Engineers 2
+        echo loader. This SE1 plugin supports Legacy and Interim editions only.
+    )
 ) else (
     echo Done. Start the game through Pulsar and test the plugin.
     echo To remove it later, run Uninstall-TestPlugin.bat.
+    if exist "%PULSAR%\Modern" echo NOTE: Pulsar Modern ^(Space Engineers 2 loader^) was skipped on purpose - SE1 plugins do not go there.
 )
 echo.
 pause
@@ -88,6 +92,17 @@ if %ERRORLEVEL% NEQ 0 (
     echo ERROR: could not copy to "%DEST%".
     echo Make sure the game is CLOSED and try again.
     exit /b 2
+)
+
+REM Report each DLL's runtime family so a wrong-edition file is visible immediately
+REM (a .NET Core DLL in Legacy - or a .NET Framework DLL in Interim - is exactly what
+REM causes a runtime warning in Pulsar's plugin list and the plugin not loading).
+for %%D in ("%SCRIPT_DIR%Plugin\%EDITION%\*.dll") do (
+    findstr /m /c:".NETCoreApp" "%%~fD" >nul 2>nul && (
+        echo [Pulsar %EDITION%] %%~nxD = .NET Core ^(CoreCLR^) build
+    ) || (
+        echo [Pulsar %EDITION%] %%~nxD = .NET Framework 4.8 ^(CLR^) build
+    )
 )
 
 set "ENABLED_ANY=0"

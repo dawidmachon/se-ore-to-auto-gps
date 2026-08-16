@@ -60,12 +60,36 @@ echo Staging %NAME% v%VER% (%CONFIG%)...
 copy /y "Package\Install-TestPlugin.bat" "%STAGE%\" >nul
 copy /y "Package\Uninstall-TestPlugin.bat" "%STAGE%\" >nul
 copy /y "Package\README-test.txt" "%STAGE%\" >nul
+if exist "Package\Diagnostics.bat" copy /y "Package\Diagnostics.bat" "%STAGE%\" >nul
 
 REM net48 build -> Pulsar Legacy, net10.0 build -> Pulsar Interim
 copy /y "ClientPlugin\bin\%CONFIG%\net48\%NAME%.dll" "%STAGE%\Plugin\Legacy\" >nul
 copy /y "%NAME%.xml" "%STAGE%\Plugin\Legacy\%NAME%.dll.xml" >nul
 copy /y "ClientPlugin\bin\%CONFIG%\net10.0\%NAME%.dll" "%STAGE%\Plugin\Interim\" >nul
 copy /y "%NAME%.xml" "%STAGE%\Plugin\Interim\%NAME%.dll.xml" >nul
+
+REM -----------------------------------------------------------
+REM Runtime guard: a wrong-TFM DLL in an edition folder is exactly
+REM what Pulsar shows as a runtime/Host warning without loading the
+REM plugin (and WITHOUT any log line). Verify both staged DLLs.
+REM -----------------------------------------------------------
+findstr /m /c:".NETCoreApp" "%STAGE%\Plugin\Legacy\%NAME%.dll" >nul 2>nul && (
+    echo ERROR: Legacy stage contains a .NET Core build of %NAME%.dll - aborting.
+    exit /b 1
+)
+findstr /m /c:".NETFramework,Version=v4.8" "%STAGE%\Plugin\Legacy\%NAME%.dll" >nul 2>nul || (
+    echo ERROR: Legacy stage does not look like a net48 build of %NAME%.dll - aborting.
+    exit /b 1
+)
+findstr /m /c:".NETCoreApp" "%STAGE%\Plugin\Interim\%NAME%.dll" >nul 2>nul || (
+    echo ERROR: Interim stage does not look like a .NET Core build of %NAME%.dll - aborting.
+    exit /b 1
+)
+findstr /m /c:".NETFramework,Version=v4.8" "%STAGE%\Plugin\Interim\%NAME%.dll" >nul 2>nul && (
+    echo ERROR: Interim stage contains a net48 build of %NAME%.dll - aborting.
+    exit /b 1
+)
+echo Runtime check OK: Legacy = net48 ^(CLR^), Interim = .NET Core ^(CoreCLR^).
 
 if exist "%ZIP%" del /q "%ZIP%"
 
