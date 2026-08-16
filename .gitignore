@@ -372,3 +372,6 @@ MigrationBackup/
 
 # Local agent / harness config (machine-specific, never published)
 /.pi/
+
+# Tester package output (never commit zips/passwords/links)
+/dist/

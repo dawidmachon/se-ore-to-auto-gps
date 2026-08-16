@@ -5,9 +5,10 @@ ore your ore detector detects as GPS waypoints — **but only when you press you
 with an approximate deposit size measured in the background. The keypress is a fairness gate:
 nothing is ever created automatically, so ore can never be marked while AFK.
 
-> **First run:** the mark key ships **unbound** (every letter is taken by vanilla). Bind it in
-> the plugin settings — *Player interaction → Mark detected ore* — then press it in-game to mark
-> everything your detector has found so far.
+> **First run:** the mark key ships bound to **Alt+K** (all plain letters are taken by vanilla).
+> Rebind it in the plugin settings — *Player interaction → Mark detected ore* — then press it
+> in-game to mark everything detected since the last press. If you unbind it, nothing can ever
+> be marked.
 
 ## It's legit
 
@@ -22,8 +23,11 @@ the ore detector never tells you which voxel variant a deposit is (dense ice vs 
 
 ## Features
 
-- **Keybind-gated** — detection and background sizing accumulate silently; one keypress marks
-  everything found so far. No keypress, no markers — ever.
+- **Keybind-gated** — detection and background sizing accumulate silently; a keypress marks
+  what was found since the last press. No keypress, no markers — ever.
+- **Bounded memory between presses** — while waiting for the keypress the plugin remembers only
+  the *N* most recent detections (default 5, configurable; 0 = remember everything). Older
+  detections are forgotten, so a long unattended stretch never floods your GPS list.
 - **Correct sizing & centering** — each deposit is measured at its own world position, so it works
   at any ship speed. One deposit = one waypoint at its mass-weighted center, with the true total
   size — no matter how wide the deposit is.
@@ -57,9 +61,11 @@ Search for **"Ore to Auto Gps"** in Pulsar's plugin list and enable it. *(Not pu
 ## Configuration
 
 Open the plugin's config dialog from Pulsar's plugin list. The headline option is the **Mark
-detected ore** keybind (Player interaction section; unbound by default). Press it in-game to
-create markers for everything detected so far — it is ignored while you are typing in chat or a
-text field. Other options: marker spacing, size toggle, HUD visibility, coordinates in the name,
+detected ore** keybind (Player interaction section; default Alt+K). Press it in-game to create
+markers for everything detected since the last press — it is ignored while you are typing in
+chat or a text field. Next to it, **Remembered detections** caps how many of the most recent
+detections are kept while waiting for the keypress (default 5; 0 = remember everything).
+Other options: marker spacing, size toggle, HUD visibility, coordinates in the name,
 small-deposit clustering (clutter control), and per-ore toggles (Iron, Nickel, Cobalt, Magnesium,
 Silicon, Silver, Gold, Platinum, Uranium, Ice, Stone). A **Clear all** button removes every GPS
 created this session.

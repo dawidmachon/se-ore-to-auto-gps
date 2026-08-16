@@ -8,11 +8,15 @@ Design constraints (do not break these):
   read is used purely to SIZE already-detected deposits; any ore the detector did not find is
   discarded in `Publish` (see `IsDetected`). Never reveal undetected ore.
 - **Player-interaction gate (PluginHub requirement):** GPS markers are created ONLY when the player
-  presses the configured key (`Config.MarkKey`, polled via `Binding.HasPressed` in
+  presses the configured key (`Config.MarkKey`, default Alt+K, polled via `Binding.HasPressed` in
   `AutoGpsService.HandleMarkInput` - the single publish path). Detection and background sizing
-  accumulate without input, but no keypress means no marker ever (anti-AFK). Key ships unbound;
+  accumulate without input, but no keypress means no marker ever (anti-AFK). If the key is unbound
   the plugin toasts once to point at the setting. Keypresses are ignored while a GUI control has
   keyboard focus (chat / text fields).
+- **Rolling memory between presses:** only the N most recent detections are remembered while
+  waiting for the keypress (`Config.RememberedDetections`, default 5, 0 = remember everything);
+  `AutoGpsService.TrimMemory` enforces it on `s_pendingSizing` + `s_pending` (FIFO, oldest first)
+  every update, so an unbounded backlog can never build up.
 - **Vanilla-information limit (PluginHub requirement):** size figures must not expose more than
   vanilla knows. Rough sizes are fine, but yields are computed from a **baseline variant per ORE**
   (`VoxelScan.BaselineYield`: `<Ore>_01`, else ore-named material, else richest variant) - never

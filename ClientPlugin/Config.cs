@@ -6,6 +6,7 @@ using ClientPlugin.Settings;
 using ClientPlugin.Settings.Elements;
 using ClientPlugin.Settings.Tools;
 using Sandbox.Graphics.GUI;
+using VRage.Input;
 using VRageMath;
 
 namespace ClientPlugin;
@@ -14,9 +15,13 @@ public class Config : INotifyPropertyChanged
 {
     #region Options
 
-    // Unassigned by default: every letter is bound in vanilla, so the player picks a free key.
-    // Nothing is ever marked while this is unbound (player-interaction gate).
-    private Binding markKey = new Binding();
+    // Alt+K by default (every plain letter is bound in vanilla); rebindable. Unbound =
+    // nothing is ever marked (player-interaction gate) + a one-time toast points here.
+    private Binding markKey = new Binding(MyKeys.K, alt: true);
+
+    // Rolling memory between keypresses: only the N most recent detections are remembered;
+    // older ones are forgotten and never marked. 0 = remember everything.
+    private int rememberedDetections = 5;
 
     private int dedupRadiusMeters = 100;
     private bool showQuantity = true;
@@ -47,11 +52,18 @@ public class Config : INotifyPropertyChanged
     public readonly string Title = "Ore to Auto Gps";
 
     [Separator("Player interaction")]
-    [Keybind(label: "Mark detected ore", description: "Press this key in-game to create GPS markers for everything your ore detector has detected so far. Nothing is ever marked without this keypress.")]
+    [Keybind(label: "Mark detected ore", description: "Press this key in-game to create GPS markers for everything your ore detector has detected since the last press. Nothing is ever marked without this keypress. Default: Alt+K.")]
     public Binding MarkKey
     {
         get => markKey;
         set => SetField(ref markKey, value);
+    }
+
+    [Slider(0f, 100f, 1f, SliderAttribute.SliderType.Integer, description: "How many of the most recent detections are remembered while waiting for the mark key. Older detections are forgotten and never marked. 0 = remember everything.")]
+    public int RememberedDetections
+    {
+        get => rememberedDetections;
+        set => SetField(ref rememberedDetections, value);
     }
 
     [Separator("Markers")]

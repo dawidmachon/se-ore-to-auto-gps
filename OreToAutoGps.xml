@@ -5,12 +5,12 @@
     <FriendlyName>Ore to Auto Gps</FriendlyName>
     <Author>dawidmachon</Author>
     <Tooltip>Mark ore your ore detector detects as GPS waypoints - but only when you press your mark key. Approximate, vanilla-level size info.</Tooltip>
-    <Description>Ore to Auto Gps turns ore your ore detector has already detected into GPS waypoints - created only when you press your configurable mark key (player interaction required: nothing is ever marked automatically, so ore cannot be marked while AFK). It is legit: it ONLY ever marks ore the detector has already found; it never reveals ore you have not detected.
+    <Description>Ore to Auto Gps turns ore your ore detector has already detected into GPS waypoints - created only when you press your mark key (default Alt+K, rebindable in the plugin settings). Nothing is ever marked automatically, so ore cannot be marked while AFK; and while waiting for the keypress the plugin remembers only the most recent detections (configurable, default 5; 0 = remember everything), so a long idle stretch never floods the GPS list. It is legit: it ONLY ever marks ore the detector has already found; it never reveals ore you have not detected.
 
 To give each waypoint an approximate size and proper center, it measures the already-detected deposits with a background voxel read (anything the detector did not find is discarded). Size info stays at vanilla's information level: rough estimates computed from a BASELINE yield per ore (all ice is sized as regular ice, for example), because the ore detector does not expose which voxel variant (dense ice vs ice) a deposit is.
 
 Features:
-- Player-interaction gate - press your configured key to mark everything the detector has found so far; no keypress, no markers. The key is configurable in the plugin settings (unbound by default).
+- Player-interaction gate - press your mark key (default Alt+K, rebindable) to mark everything detected since the last press; no keypress, no markers. Bounded memory between presses: only the N most recent detections are remembered (default 5, configurable; 0 = remember all).
 - Connected-component grouping: one deposit = one marker at its true center with the real total size, no matter how wide it is.
 - Rough size bands (Trace/Small/Medium/Large/Huge, Huge >= 5,000,000 kg of ore) plus an approximate yield in kg using the baseline yield per ore (variant-agnostic, like the detector's own information).
 - Field markers: scattered tiny deposits within a radius share one marker to avoid clutter.

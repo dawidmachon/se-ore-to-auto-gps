@@ -22,9 +22,13 @@ namespace ClientPlugin;
 // marked.
 //
 // Player-interaction gate (PluginHub requirement): markers are created ONLY when the player
-// presses the configured key (settings -> "Mark detected ore"). Detection and background
-// sizing accumulate silently, and one keypress publishes everything the detector has found so
-// far - so an AFK script that never sends input never gets a single marker.
+// presses the configured key (settings -> "Mark detected ore", default Alt+K). Detection and
+// background sizing accumulate silently, and a keypress publishes what was detected since the
+// last press - so an AFK script that never sends input never gets a single marker.
+//
+// Rolling memory between keypresses: only the N most recent detections are remembered
+// (Config.RememberedDetections, default 5; 0 = remember everything) - a long unattended
+// stretch can never flood the GPS list on the next press.
 //
 // Sizing scans are centred on each detected deposit's OWN position (not the ship), so it works
 // correctly at any speed. Newly detected positions queue up and are sized one area per cycle.
@@ -60,7 +64,10 @@ public static class AutoGpsService
 
     private static readonly ConcurrentQueue<List<FoundOre>> s_scanResults = new ConcurrentQueue<List<FoundOre>>();
     private static volatile bool s_scanRunning;
-    private static readonly Dictionary<string, List<FoundOre>> s_pending = new Dictionary<string, List<FoundOre>>();
+
+    // Sized detections waiting for the mark keypress (main-thread only). FIFO: the rolling
+    // memory limit drops the OLDEST entries when the queue grows past the configured count.
+    private static readonly Queue<FoundOre> s_pending = new Queue<FoundOre>();
     private static readonly Dictionary<string, List<PublishedEntry>> s_published = new Dictionary<string, List<PublishedEntry>>();
     private static readonly Dictionary<int, PublishedEntry> s_publishedByHash = new Dictionary<int, PublishedEntry>();
 
@@ -92,6 +99,9 @@ public static class AutoGpsService
         var session = MySession.Static;
         if (session == null) return;
         double now = session.ElapsedPlayTime.TotalSeconds;
+
+        // Rolling memory between keypresses: forget the oldest detections beyond the limit.
+        TrimMemory();
 
         while (s_capture.TryDequeue(out var o))
             AddDetected(o.Material, o.Position);
@@ -181,6 +191,15 @@ public static class AutoGpsService
         catch { }
     }
 
+    // Enforces the rolling memory limit on both waiting queues (main-thread only).
+    private static void TrimMemory()
+    {
+        int limit = Math.Max(0, Config.Current.RememberedDetections);
+        if (limit <= 0) return; // 0 = remember everything
+        while (s_pendingSizing.Count > limit) s_pendingSizing.Dequeue();
+        while (s_pending.Count > limit) s_pending.Dequeue();
+    }
+
     // Records a detection (legit gate) and queues it for sizing if it is new.
     private static void AddDetected(string material, Vector3D pos)
     {
@@ -199,9 +218,7 @@ public static class AutoGpsService
 
     private static void AddPending(FoundOre o)
     {
-        if (!s_pending.TryGetValue(o.Material, out var list))
-        { list = new List<FoundOre>(); s_pending[o.Material] = list; }
-        list.Add(o);
+        s_pending.Enqueue(o);
     }
 
     private static void Publish(out int added, out int updated, out int skipped)
@@ -222,7 +239,17 @@ public static class AutoGpsService
         long minorM3 = Math.Max(0, cfg.MinorThreshold);
         int fieldRadius = Math.Max(1, cfg.FieldRadius);
 
-        foreach (var kv in s_pending)
+        // Drain what is waiting (oldest first) and group it by material.
+        var byMaterial = new Dictionary<string, List<FoundOre>>();
+        while (s_pending.Count > 0)
+        {
+            var o = s_pending.Dequeue();
+            if (!byMaterial.TryGetValue(o.Material, out var list))
+            { list = new List<FoundOre>(); byMaterial[o.Material] = list; }
+            list.Add(o);
+        }
+
+        foreach (var kv in byMaterial)
         {
             string material = kv.Key;
             var points = kv.Value;
@@ -263,8 +290,6 @@ public static class AutoGpsService
                 }
             }
         }
-
-        s_pending.Clear();
     }
 
     // True if the detector reported this material near the given position.
