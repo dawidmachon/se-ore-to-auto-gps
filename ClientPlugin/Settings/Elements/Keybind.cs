@@ -36,34 +36,16 @@ internal class KeybindAttribute : Attribute, IElement
 
         var label = new MyGuiControlLabel(text: Tools.Tools.GetLabelOrDefault(name, Label));
 
-        var ctrl = new MyGuiControlCheckbox(isChecked: binding.Ctrl, toolTip: "Ctrl");
-        var alt = new MyGuiControlCheckbox(isChecked: binding.Alt, toolTip: "Alt");
-        var shift = new MyGuiControlCheckbox(isChecked: binding.Shift, toolTip: "Shift");
-            
-        ctrl.IsCheckedChanged += (cb) => {
-            var b = this.propertyGetter();
-            b.Ctrl = cb.IsChecked;
-            this.propertySetter(b);
-        };
-
-        alt.IsCheckedChanged += (cb) => {
-            var b = this.propertyGetter();
-            b.Alt = cb.IsChecked;
-            this.propertySetter(b);
-        };
-
-        shift.IsCheckedChanged += (cb) => {
-            var b = this.propertyGetter();
-            b.Shift = cb.IsChecked;
-            this.propertySetter(b);
-        };
-
+        // The vanilla assign-key dialog captures modifier COMBOS natively (pressing Alt+L
+        // stores key L + Alt modifier), so the binding is initialized with - and saved back
+        // with - its modifiers. No separate modifier checkboxes are needed.
         var control = new MyControl(
             MyStringId.GetOrCompute($"{name.Replace(" ", "")}Keybind"),
             MyStringId.GetOrCompute(name),
             MyGuiControlTypeEnum.General,
             null,
-            binding.Key);
+            binding.Key,
+            keyModifiers: binding.GetKeyboardModifiers());
 
         StringBuilder output = null;
         control.AppendBoundButtonNames(ref output, MyGuiInputDeviceEnum.Keyboard);
@@ -83,9 +65,6 @@ internal class KeybindAttribute : Attribute, IElement
         {
             new Control(label, minWidth: Control.LabelMinWidth),
             new Control(button),
-            new Control(ctrl, offset: new Vector2(0f, -0.0025f)),
-            new Control(alt, offset: new Vector2(0f, -0.0025f)),
-            new Control(shift, offset: new Vector2(0f, -0.0025f)),
         };
     }
 
@@ -168,6 +147,7 @@ internal class KeybindAttribute : Attribute, IElement
 
         var binding = propertyGetter();
         binding.Key = userData.Control.GetKeyboardControl();
+        binding.SetKeyboardModifiers(userData.Control.GetKeyboardModifier()); // combo from the dialog (e.g. Alt+L)
         propertySetter(binding);
 
         MyControl.AppendUnknownTextIfNeeded(ref output, MyTexts.GetString(MyCommonTexts.UnknownControl_None));

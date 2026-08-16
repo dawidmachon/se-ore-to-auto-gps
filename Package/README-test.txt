@@ -1,4 +1,4 @@
-Ore to Auto Gps - internal test build v1.2.1
+Ore to Auto Gps - internal test build v1.2.2
 =============================================
 
 This archive is password-protected (AES-256). Extract it with 7-Zip or
@@ -11,8 +11,11 @@ scans for or reveals ore the detector did not find; the background voxel
 read only measures the size of already-detected deposits.
 
 This build adds (vs. the previous test round):
-  - default mark key changed from Alt+K to Alt+L (rebindable in plugin
-    settings),
+  - keybind fix: combos captured directly in the assign-key dialog
+    (e.g. press Alt+P there) are now honored - previously only the
+    plain key was used and the modifier was silently dropped. The
+    Ctrl/Alt/Shift checkboxes next to the keybind are gone (the dialog
+    covers them); existing saved configs keep working,
   - a marker cap per press: at most N NEW markers per keypress, the most
     recent deposits (default 5, slider 0-5; 0 = no limit). A wide deposit
     or a whole field of small deposits counts as ONE marker; updating
@@ -76,7 +79,13 @@ e) Baseline yields (new sizing rule):
    snow and the other is ice (all sized as regular ice, ratio 5).
    Same for stone/soil areas on planets (all sized as regular stone).
 
-f) Old features still working:
+f) Keybind rebind (new):
+   In the plugin settings click the "Mark detected ore" button and
+   press a COMBO, e.g. Ctrl+J. The button must show "Ctrl+J". In game,
+   Ctrl+J must mark ore, plain J must NOT. Rebind back to Alt+L the
+   same way and check it still works. (Alt+L remains the default.)
+
+g) Old features still working:
    - Size bands in the name (Trace/Small/Medium/Large/Huge) and
      "~X kg ore -> ~Y kg ingots @100%" in the description.
    - Field markers: scattered tiny deposits (uranium boulders on the
