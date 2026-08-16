@@ -15,6 +15,7 @@ Features:
 - Rough size bands (Trace/Small/Medium/Large/Huge, Huge >= 5,000,000 kg of ore) plus an approximate yield in kg using the baseline yield per ore (variant-agnostic, like the detector's own information).
 - Field markers: scattered tiny deposits within a radius share one marker to avoid clutter.
 - Per-ore toggles, distinct color per ore, smart cross-scan de-duplication.
+- Configurable GPS name prefix (default "Ore - ") so all auto-added waypoints group together in the GPS list for bulk manage/delete and GPS grouping plugins.
 - Runs on a background thread (never freezes the game). Works on dedicated servers (client-side).
 
 Report bugs via GitHub issues.</Description>

@@ -26,6 +26,7 @@ public class Config : INotifyPropertyChanged
     private bool showQuantity = true;
     private bool showOnHud = true;
     private bool includeCoordsInName = false;
+    private string gpsNamePrefix = "Ore - ";
 
     private int minorThreshold = 1000;
     private int fieldRadius = 500;
@@ -92,6 +93,13 @@ public class Config : INotifyPropertyChanged
     {
         get => includeCoordsInName;
         set => SetField(ref includeCoordsInName, value);
+    }
+
+    [Textbox(label: "GPS name prefix", description: "Prefix added to every marker name (e.g. 'Ore - ') so auto-added waypoints group together in the GPS list for bulk manage/delete. Empty = no prefix.")]
+    public string GpsNamePrefix
+    {
+        get => gpsNamePrefix;
+        set => SetField(ref gpsNamePrefix, value);
     }
 
     [Separator("Small deposits (clutter control)")]

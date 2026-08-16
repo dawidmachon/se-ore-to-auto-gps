@@ -38,6 +38,8 @@ the ore detector never tells you which voxel variant a deposit is (dense ice vs 
 - **Field markers** — scattered tiny deposits (e.g. uranium boulders) within a radius share one
   marker (`Uranium ×N`) so the GPS list stays clean.
 - **Per-ore toggles**, a distinct color per ore, and smart de-duplication across scans.
+- **Name prefix** — an optional prefix (default `Ore - `) groups all auto-added waypoints
+  together in the GPS list for bulk management, and works with GPS grouping plugins.
 - **Performant** — sizing runs on a background thread; only newly detected ore is measured, one
   area at a time.
 - Works on **dedicated servers** (client-side only).
@@ -67,6 +69,7 @@ markers for everything detected since the last press — it is ignored while you
 chat or a text field. Next to it, **Max markers per press** caps how many new markers one
 keypress creates (default 5; 0 = no limit; updates to existing markers are not capped).
 Other options: marker spacing, size toggle, HUD visibility, coordinates in the name,
+**GPS name prefix** (default `Ore - `, empty = off),
 small-deposit clustering (clutter control), and per-ore toggles (Iron, Nickel, Cobalt, Magnesium,
 Silicon, Silver, Gold, Platinum, Uranium, Ice, Stone). A **Clear all** button removes every GPS
 created this session.

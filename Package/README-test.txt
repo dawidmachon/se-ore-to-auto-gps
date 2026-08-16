@@ -1,4 +1,4 @@
-Ore to Auto Gps - internal test build v1.2.2
+Ore to Auto Gps - internal test build v1.3.0
 =============================================
 
 This archive is password-protected (AES-256). Extract it with 7-Zip or
@@ -11,6 +11,8 @@ scans for or reveals ore the detector did not find; the background voxel
 read only measures the size of already-detected deposits.
 
 This build adds (vs. the previous test round):
+  - configurable GPS name prefix (default "Ore - ") so all auto-added
+    waypoints group together in the GPS list (idea from PR #1),
   - keybind fix: combos captured directly in the assign-key dialog
     (e.g. press Alt+P there) are now honored - previously only the
     plain key was used and the modifier was silently dropped. The
@@ -85,7 +87,13 @@ f) Keybind rebind (new):
    Ctrl+J must mark ore, plain J must NOT. Rebind back to Alt+L the
    same way and check it still works. (Alt+L remains the default.)
 
-g) Old features still working:
+g) GPS name prefix (new):
+   Default "Ore - ": every marker name must start with it (e.g.
+   "Ore - Iron ~Small", "Ore - Uranium x12") - they sort/group together
+   in the GPS list. Set it empty in the settings: new markers come out
+   unprefixed. (Markers already created keep their old names.)
+
+h) Old features still working:
    - Size bands in the name (Trace/Small/Medium/Large/Huge) and
      "~X kg ore -> ~Y kg ingots @100%" in the description.
    - Field markers: scattered tiny deposits (uranium boulders on the
@@ -96,7 +104,7 @@ g) Old features still working:
 3. Settings (defaults after install)
 -----------------------------------
 Mark key: Alt+L. Max markers per press: 5. Dedup radius: 100 m.
-Show quantity: on. Show on HUD: on. Minor threshold: 1000 m^3.
+GPS name prefix: "Ore - ". Show quantity: on. Show on HUD: on. Minor threshold: 1000 m^3.
 Field radius: 500 m. All ores on except Stone. Modded ores: on.
 
 4. If something does not work

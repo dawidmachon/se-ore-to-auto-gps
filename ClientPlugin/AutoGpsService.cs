@@ -551,9 +551,13 @@ public static class AutoGpsService
             : "";
         string coord = comp.Position.X.ToString("F0", CultureInfo.InvariantCulture) + "," + comp.Position.Y.ToString("F0", CultureInfo.InvariantCulture) + "," + comp.Position.Z.ToString("F0", CultureInfo.InvariantCulture);
 
+        // Optional prefix (idea from rglx, PR #1) so auto-added waypoints group together in
+        // the GPS list - easy bulk select/delete and grouping-plugin support.
+        string prefix = string.IsNullOrEmpty(cfg.GpsNamePrefix) ? "" : cfg.GpsNamePrefix;
+
         if (isField && fieldCount > 1)
         {
-            name = material + " x" + fieldCount.ToString(CultureInfo.InvariantCulture);
+            name = prefix + material + " x" + fieldCount.ToString(CultureInfo.InvariantCulture);
             if (cfg.IncludeCoordsInName) name += " " + coord;
             var d = new StringBuilder();
             d.Append(fieldCount).Append(" deposits");
@@ -562,7 +566,7 @@ public static class AutoGpsService
             return;
         }
 
-        name = material;
+        name = prefix + material;
         if (cfg.ShowQuantity && comp.SolidVoxels > 0) name += " ~" + SizeWord(oreKg);
         if (cfg.IncludeCoordsInName) name += " " + coord;
         var sb = new StringBuilder();
