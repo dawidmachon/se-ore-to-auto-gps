@@ -32,11 +32,15 @@ the ore detector never tells you which voxel variant a deposit is (dense ice vs 
 - **Correct sizing & centering** — each deposit is measured at its own world position, so it works
   at any ship speed. One deposit = one waypoint at its mass-weighted center, with the true total
   size — no matter how wide the deposit is.
-- **Size bands** in the GPS name: `Trace / Small / Medium / Large / Huge` (Huge ≥ 5,000,000 kg of
-  ore), and the description shows the approximate yield in kilograms: `~6.5k kg ore -> ~4.5k kg
-  ingots @100%` — computed from the per-ore baseline yield (default refinery, no yield modules).
+- **Size bands** in the GPS name: `<Mineral> <A|P> <Tier> <amount>` — e.g. `Ore - Gold A Titanic 22.5M`
+  (A = asteroid, P = planet; tiers Atom/Compact/Expand/Giant/Huge/Immense/Mammoth/Titanic by kg of
+  ore, Titanic ≥ 250M) — and the description shows the approximate yield in kilograms:
+  `~6.5k kg ore -> ~4.5k kg ingots @100%` — computed from the per-ore baseline yield (default
+  refinery, no yield modules).
+- **Yield calibration** — a display multiplier (default 1.0 = vanilla) scaling the shown kg and
+  tiers to what your server actually yields; mine a fresh deposit empty and divide to find it.
 - **Field markers** — scattered tiny deposits (e.g. uranium boulders) within a radius share one
-  marker (`Uranium ×N`) so the GPS list stays clean.
+  marker (`Ore - Uranium A x12 8.4M`) so the GPS list stays clean.
 - **Per-ore toggles**, a distinct color per ore, and smart de-duplication across scans.
 - **Name prefix** — an optional prefix (default `Ore - `) groups all auto-added waypoints
   together in the GPS list for bulk management, and works with GPS grouping plugins.

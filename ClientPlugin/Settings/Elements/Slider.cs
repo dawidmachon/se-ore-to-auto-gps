@@ -41,7 +41,14 @@ internal class SliderAttribute : Attribute, IElement
             switch (Type)
             {
                 case SliderType.Integer:
-                    int intValue = Convert.ToInt32(element.Value);
+                    // Guard: extreme slider configs (huge ranges / degenerate steps) can push the
+                    // control's internal float beyond Int32 (or NaN) - Convert.ToInt32 would throw
+                    // OverflowException and crash the settings dialog while it renders.
+                    double v = element.Value;
+                    if (double.IsNaN(v) || double.IsInfinity(v)) v = Min;
+                    if (v > int.MaxValue) v = int.MaxValue;
+                    if (v < int.MinValue) v = int.MinValue;
+                    int intValue = Convert.ToInt32(Math.Round(v));
                     propertySetter(intValue);
                     valueLabel.Text = intValue.ToString();
                     break;

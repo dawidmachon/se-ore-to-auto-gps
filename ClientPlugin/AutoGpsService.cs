@@ -44,6 +44,7 @@ public static class AutoGpsService
         public double OreRatio;
         public double IngotRatio;
         public long Seq; // newest member's detection order (recency for the per-press cap)
+        public string Source; // "A" asteroid / "P" planet (from clustered points)
     }
 
     private class PublishedEntry
@@ -269,7 +270,7 @@ public static class AutoGpsService
             {
                 var minorPoints = new List<FoundOre>(minor.Count);
                 foreach (var m in minor)
-                    minorPoints.Add(new FoundOre { Material = material, Position = m.Position, SolidVoxels = m.SolidVoxels, SpatialRadius = m.SpatialRadius, Seq = m.Seq });
+                    minorPoints.Add(new FoundOre { Material = material, Position = m.Position, SolidVoxels = m.SolidVoxels, SpatialRadius = m.SpatialRadius, Seq = m.Seq, Source = m.Source, OreRatio = m.OreRatio, IngotRatio = m.IngotRatio });
                 foreach (var f in ClusterComponents(minorPoints, fieldRadius))
                 {
                     bool anyDetected = f.Members != null && f.Members.Count > 0 &&
@@ -416,7 +417,7 @@ public static class AutoGpsService
         int newSolid = (int)total;
         double newRadius = Math.Sqrt(maxD);
 
-        var merged = new Component { Position = newCenter, SolidVoxels = newSolid, SpatialRadius = newRadius, Members = entry.Members };
+        var merged = new Component { Position = newCenter, SolidVoxels = newSolid, SpatialRadius = newRadius, Members = entry.Members, Source = comp.Source, OreRatio = comp.OreRatio, IngotRatio = comp.IngotRatio };
         BuildGpsText(material, merged, true, newCount, cfg, out string name, out string desc);
         Color color = s_colors.TryGetValue(material, out var c) ? c : Color.Yellow;
         try
@@ -498,7 +499,7 @@ public static class AutoGpsService
             if (totalW > 0) center /= totalW;
             double maxDistSq = 0;
             foreach (int idx in g) { double d = Vector3D.DistanceSquared(center, points[idx].Position); if (d > maxDistSq) maxDistSq = d; }
-            result.Add(new Component { Position = center, SolidVoxels = totalSolid, SpatialRadius = Math.Sqrt(maxDistSq), Members = members, OreRatio = points.Count > 0 ? points[0].OreRatio : 0, IngotRatio = points.Count > 0 ? points[0].IngotRatio : 0, Seq = seq });
+            result.Add(new Component { Position = center, SolidVoxels = totalSolid, SpatialRadius = Math.Sqrt(maxDistSq), Members = members, OreRatio = points.Count > 0 ? points[0].OreRatio : 0, IngotRatio = points.Count > 0 ? points[0].IngotRatio : 0, Seq = seq, Source = points.Count > 0 ? points[0].Source : "A" });
         }
         return result;
     }
@@ -543,8 +544,12 @@ public static class AutoGpsService
     private static void BuildGpsText(string material, Component comp, bool isField, int fieldCount, Config cfg, out string name, out string desc)
     {
         long approxM3 = (long)comp.SolidVoxels * 64;
-        long oreKg = comp.OreRatio > 0 ? (long)(approxM3 * comp.OreRatio) : 0;
-        long ingotKg = comp.IngotRatio > 0 ? (long)(approxM3 * comp.IngotRatio) : 0;
+        // User yield calibration: the estimate itself stays vanilla-baseline (PluginHub rule);
+        // this DISPLAY multiplier lets the user match kg/tiers to what their server actually
+        // yields (dedicated servers often multiply harvest server-side - experiment to find it).
+        double mult = Math.Max(0.01f, cfg.YieldMultiplier);
+        long oreKg = comp.OreRatio > 0 ? (long)(approxM3 * comp.OreRatio * mult) : 0;
+        long ingotKg = comp.IngotRatio > 0 ? (long)(approxM3 * comp.IngotRatio * mult) : 0;
         // Description kept short (vanilla multiline-text crash). Show kg only - what the inventory shows.
         string yield = oreKg > 0
             ? Compact(oreKg) + " kg ore" + (ingotKg > 0 ? " -> " + Compact(ingotKg) + " kg ingots @100%" : "")
@@ -554,10 +559,14 @@ public static class AutoGpsService
         // Optional prefix (idea from rglx, PR #1) so auto-added waypoints group together in
         // the GPS list - easy bulk select/delete and grouping-plugin support.
         string prefix = string.IsNullOrEmpty(cfg.GpsNamePrefix) ? "" : cfg.GpsNamePrefix;
+        // Source tag: A = asteroid, P = planet.
+        string source = string.IsNullOrEmpty(comp.Source) ? "A" : comp.Source;
 
         if (isField && fieldCount > 1)
         {
-            name = prefix + material + " x" + fieldCount.ToString(CultureInfo.InvariantCulture);
+            // Field convention: <prefix><material> <A|P> x<count> <oreKg-compact>
+            name = prefix + material + " " + source + " x" + fieldCount.ToString(CultureInfo.InvariantCulture);
+            if (cfg.ShowQuantity && oreKg > 0) name += " " + Compact(oreKg);
             if (cfg.IncludeCoordsInName) name += " " + coord;
             var d = new StringBuilder();
             d.Append(fieldCount).Append(" deposits");
@@ -566,8 +575,12 @@ public static class AutoGpsService
             return;
         }
 
-        name = prefix + material;
-        if (cfg.ShowQuantity && comp.SolidVoxels > 0) name += " ~" + SizeWord(oreKg);
+        // Single-deposit convention: <prefix><material> <A|P> <size-tier> <oreKg-compact, no units>
+        // e.g. "Ore - Iron A Compact 63.5k" / "Ore - Ice P Titanic 312M". The trailing number
+        // is the calibrated ore kg (k/M/B are magnitude multipliers, not units).
+        name = prefix + material + " " + source;
+        if (cfg.ShowQuantity && comp.SolidVoxels > 0)
+            name += " " + SizeWord(oreKg) + " " + Compact(Math.Max(oreKg, 1));
         if (cfg.IncludeCoordsInName) name += " " + coord;
         var sb = new StringBuilder();
         if (comp.SolidVoxels > 0)
@@ -589,13 +602,20 @@ public static class AutoGpsService
     }
 
     // Size tier by ore kg (the mined yield - what the inventory shows). Thresholds tunable.
+    // Size tier by CALIBRATED ore kg (vanilla kg x YieldMultiplier; the number in the GPS
+    // name is the calibrated kg itself, compact, no units):
+    //   < 25k Atom | 25k-100k Compact | 100k-1M Expand | 1M-5M Giant | 5M-30M Huge |
+    //   30M-100M Immense | 100M-250M Mammoth | 250M+ Titanic
     private static string SizeWord(long oreKg)
     {
-        if (oreKg < 10000L) return "Trace";
-        if (oreKg < 100000L) return "Small";
-        if (oreKg < 1000000L) return "Medium";
-        if (oreKg < 5000000L) return "Large";
-        return "Huge";
+        if (oreKg < 25000L) return "Atom";
+        if (oreKg < 100000L) return "Compact";
+        if (oreKg < 1000000L) return "Expand";
+        if (oreKg < 5000000L) return "Giant";
+        if (oreKg < 30000000L) return "Huge";
+        if (oreKg < 100000000L) return "Immense";
+        if (oreKg < 250000000L) return "Mammoth";
+        return "Titanic";
     }
 
     public static int ClearAll()

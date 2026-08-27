@@ -27,6 +27,7 @@ public class Config : INotifyPropertyChanged
     private bool showOnHud = true;
     private bool includeCoordsInName = false;
     private string gpsNamePrefix = "Ore - ";
+    private float yieldMultiplier = 1.0f;
 
     private int minorThreshold = 1000;
     private int fieldRadius = 500;
@@ -100,6 +101,13 @@ public class Config : INotifyPropertyChanged
     {
         get => gpsNamePrefix;
         set => SetField(ref gpsNamePrefix, value);
+    }
+
+    [Slider(0.25f, 32f, 0.25f, SliderAttribute.SliderType.Float, description: "Display calibration for the size estimates. The estimate stays vanilla-baseline underneath; this multiplies the shown kg and the tier (Atom/Compact/.../Titanic). Set it to what your server actually yields per vanilla unit (dedicated servers often multiply harvest server-side - mine a fresh deposit empty and divide your yield by the shown kg). Default 1.0 = vanilla.")]
+    public float YieldMultiplier
+    {
+        get => yieldMultiplier;
+        set => SetField(ref yieldMultiplier, value);
     }
 
     [Separator("Small deposits (clutter control)")]

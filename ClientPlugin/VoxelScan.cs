@@ -15,6 +15,7 @@ namespace ClientPlugin;
 public struct FoundOre
 {
     public string Material;
+    public string Source;      // "A" = asteroid, "P" = planet (from the voxel map the ore was read from)
     public Vector3D Position;
     public int SolidVoxels; // LOD-2 solid sample count; x64 ~= m^3
     public double SpatialRadius; // actual extent from centroid; set by clustering
@@ -67,6 +68,7 @@ public static class VoxelScan
                 WorldMatrix = top.PositionComp.WorldMatrixRef,
                 SizeInMetresHalf = top.SizeInMetresHalf,
                 LocalRef = top.PositionComp.GetPosition() - (Vector3D)top.StorageMin,
+                Source = top is MyPlanet ? "P" : "A", // planet vs asteroid voxel map
             });
         }
         maps.Clear();
@@ -92,6 +94,7 @@ public static class VoxelScan
         public MatrixD WorldMatrix;
         public Vector3 SizeInMetresHalf;
         public Vector3D LocalRef;
+        public string Source; // "P" planet / "A" asteroid
     }
 
     private static void ScanMap(MapSnapshot job, Vector3D center, double radius, List<FoundOre> result)
@@ -166,7 +169,7 @@ public static class VoxelScan
                 // Cell bounds are a box; keep only points inside the requested sphere.
                 if (Vector3D.DistanceSquared(center, world) > radiusSq) continue;
 
-                result.Add(new FoundOre { Material = material, Position = world, SolidVoxels = c, OreRatio = s_yieldOre[material], IngotRatio = s_yieldIngot[material] });
+                result.Add(new FoundOre { Material = material, Source = job.Source, Position = world, SolidVoxels = c, OreRatio = s_yieldOre[material], IngotRatio = s_yieldIngot[material] });
             }
 
             Array.Clear(sum, 0, sum.Length);

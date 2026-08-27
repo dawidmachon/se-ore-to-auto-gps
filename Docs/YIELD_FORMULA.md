@@ -58,10 +58,23 @@ A node of ~89 voxels:
 - `oreKg   = 89 × 0.009 × 1 × 3 × 2703 ≈ 6,500 kg` (inventory showed **6,482.86 kg** ✓)
 - `ingotKg = 6,500 × 0.7 ≈ 4,550 kg` (refined to **4,538.00 kg** ✓)
 
-## Size tiers (GPS name: Trace / Small / Medium / Large / Huge)
+## Size tiers (GPS name tier word, by CALIBRATED ore kg)
 
-Based on **ore kg** (see `SizeWord` in the service). Tunable:
-`Trace <10k · Small <100k · Medium <1M · Large <5M · Huge ≥5M` kg ore.
+Tiers are computed from the DISPLAYED kg (vanilla kg x the user's YieldMultiplier setting,
+see below) and the displayed number is that same calibrated kg (compact, no units - k/M are
+magnitude, not units). Thresholds:
+
+`Trace→retired. Atom <25k · Compact <100k · Expand <1M · Giant <5M · Huge <30M · Immense <100M · Mammoth <250M · Titanic ≥250M` kg.
+
+## Yield calibration (user display multiplier)
+
+The ESTIMATE underneath always stays vanilla-baseline (the PluginHub vanilla-information
+rule is unaffected: same voxel count, same ore, same baseline conversion). The `YieldMultiplier`
+setting (default 1.0) only scales what is SHOWN - kg and tier word - so players on servers with
+server-side harvest multipliers (common on dedicated servers; invisible to the client since
+`HarvestRatioMultiplier` reads 1) can make numbers match what they actually mine. How to
+find your server's factor: mine a freshly-marked deposit empty, divide your yielded kg by
+the marker's shown kg (at 1.0), set the slider to that ratio.
 
 ## Quirks / gotchas
 
