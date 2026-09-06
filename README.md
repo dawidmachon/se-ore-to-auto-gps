@@ -55,8 +55,8 @@ the ore detector never tells you which voxel variant a deposit is (dense ice vs 
 
 ## Install
 
-### From Pulsar's plugin browser (once published)
-Search for **"Ore to Auto Gps"** in Pulsar's plugin list and enable it. *(Not published yet.)*
+### From Pulsar's plugin browser
+Search for **"Ore to Auto Gps"** in Pulsar's plugin list and enable it.
 
 ### Manual install (for testing / sharing a build)
 1. Take the two files for your Pulsar edition:
@@ -77,6 +77,10 @@ Other options: marker spacing, size toggle, HUD visibility, coordinates in the n
 small-deposit clustering (clutter control), and per-ore toggles (Iron, Nickel, Cobalt, Magnesium,
 Silicon, Silver, Gold, Platinum, Uranium, Ice, Stone). A **Clear all** button removes every GPS
 created this session.
+
+Note: markers already on the GPS list keep the name they were created with - changing the prefix,
+yield calibration, or other naming settings only affects markers created or updated afterwards.
+Use **Clear all** to re-mark them with the new settings.
 
 ## Build from source
 

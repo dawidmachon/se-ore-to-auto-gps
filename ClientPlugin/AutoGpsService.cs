@@ -181,6 +181,8 @@ public static class AutoGpsService
             Publish(out int added, out int updated, out int skipped);
             if (added > 0 || updated > 0)
                 Notify("Ore to Auto Gps: " + added + " new, " + updated + " updated marker(s).");
+            else if (skipped > 0)
+                Notify("Ore to Auto Gps: no new markers - " + skipped + " candidate(s) skipped (ore type disabled or over the per-press cap).");
             else
                 Notify("Ore to Auto Gps: no detected ore waiting to be marked.");
         }
@@ -193,6 +195,9 @@ public static class AutoGpsService
     }
 
     // Records a detection (legit gate) and queues it for sizing if it is new.
+    // No second pass over s_pendingSizing needed: every queued position was first added to
+    // s_detected (same 100 m threshold) and s_detected never shrinks except Reset(), which
+    // clears both - so a position that missed s_detected cannot be queued either.
     private static void AddDetected(string material, Vector3D pos)
     {
         const double dupSq = 100.0 * 100.0;
@@ -202,9 +207,6 @@ public static class AutoGpsService
         foreach (var p in list)
             if (Vector3D.DistanceSquared(p, pos) <= dupSq) return; // already known
         list.Add(pos);
-
-        foreach (var q in s_pendingSizing)
-            if (Vector3D.DistanceSquared(q, pos) <= dupSq) return; // already queued for sizing
         s_pendingSizing.Enqueue(pos);
     }
 
@@ -219,13 +221,15 @@ public static class AutoGpsService
         added = 0; updated = 0; skipped = 0;
 
         var session = MySession.Static;
-        if (session == null || session.LocalPlayerId == 0) { s_pending.Clear(); return; }
+        // Not ready yet (e.g. still joining): keep the pending queue for the next press instead
+        // of silently discarding what the player's detector already found.
+        if (session == null || session.LocalPlayerId == 0) return;
 
         long identityId;
         IMyGpsCollection gps;
         try { identityId = session.LocalPlayerId; gps = ((IMySession)session).GPS; }
-        catch { s_pending.Clear(); return; }
-        if (gps == null) { s_pending.Clear(); return; }
+        catch { return; }
+        if (gps == null) return;
 
         var cfg = Config.Current;
         int dedup = Math.Max(1, cfg.DedupRadiusMeters);
@@ -395,6 +399,8 @@ public static class AutoGpsService
         }
         if (fresh.Count == 0) return false; // already fully covered (re-scan)
 
+        // Compute the fully merged state WITHOUT mutating the entry yet: a failed GPS operation
+        // must not corrupt the tracked state (the old marker and its bookkeeping stay intact).
         int compCount = (comp.Members != null && comp.Members.Count > 0) ? comp.Members.Count : 1;
         double perMember = (double)comp.SolidVoxels / compCount;
         int addSolid = (int)Math.Round(perMember * fresh.Count);
@@ -406,34 +412,38 @@ public static class AutoGpsService
         double total = entry.SolidVoxels + (double)addSolid;
         Vector3D newCenter = total > 0 ? (entry.Position * entry.SolidVoxels + freshCenter * addSolid) / total : entry.Position;
 
-        if (entry.Members == null) entry.Members = new List<Vector3D>();
-        entry.Members.AddRange(fresh);
-        if (entry.Members.Count > 64) entry.Members.RemoveRange(0, entry.Members.Count - 64);
+        var newMembers = entry.Members != null ? new List<Vector3D>(entry.Members) : new List<Vector3D>();
+        newMembers.AddRange(fresh);
+        if (newMembers.Count > 64) newMembers.RemoveRange(0, newMembers.Count - 64);
 
         double maxD = 0;
-        foreach (var m in entry.Members) { double d = Vector3D.DistanceSquared(newCenter, m); if (d > maxD) maxD = d; }
+        foreach (var m in newMembers) { double d = Vector3D.DistanceSquared(newCenter, m); if (d > maxD) maxD = d; }
 
         int newCount = entry.Count + fresh.Count;
         int newSolid = (int)total;
         double newRadius = Math.Sqrt(maxD);
 
-        var merged = new Component { Position = newCenter, SolidVoxels = newSolid, SpatialRadius = newRadius, Members = entry.Members, Source = comp.Source, OreRatio = comp.OreRatio, IngotRatio = comp.IngotRatio };
+        var merged = new Component { Position = newCenter, SolidVoxels = newSolid, SpatialRadius = newRadius, Members = newMembers, Source = comp.Source, OreRatio = comp.OreRatio, IngotRatio = comp.IngotRatio };
         BuildGpsText(material, merged, true, newCount, cfg, out string name, out string desc);
         Color color = s_colors.TryGetValue(material, out var c) ? c : Color.Yellow;
         try
         {
-            gps.RemoveGps(identityId, entry.Hash);
-            s_publishedByHash.Remove(entry.Hash);
+            // Create the replacement BEFORE removing the old marker, so a failed create cannot
+            // leave the player without a waypoint.
             var g = gps.Create(name, desc, newCenter, cfg.ShowOnHud, false);
             if (g == null) return false;
             g.GPSColor = color;
+            gps.RemoveGps(identityId, entry.Hash);
+            s_publishedByHash.Remove(entry.Hash);
             gps.AddGps(identityId, g);
+            // Entry state updated only once the new marker is live.
             entry.Hash = g.Hash;
             entry.Position = newCenter;
             entry.SolidVoxels = newSolid;
             entry.SpatialRadius = newRadius;
             entry.Count = newCount;
             entry.IsField = true;
+            entry.Members = newMembers;
             s_publishedByHash[g.Hash] = entry;
             return true;
         }
@@ -529,10 +539,13 @@ public static class AutoGpsService
         {
             BuildGpsText(material, comp, isField, fieldCount, cfg, out string name, out string desc);
             Color color = s_colors.TryGetValue(material, out var c) ? c : Color.Yellow;
-            gps.RemoveGps(identityId, entry.Hash); s_publishedByHash.Remove(entry.Hash);
+            // Create the replacement BEFORE removing the old marker, so a failed create cannot
+            // leave the player without a waypoint.
             var g = gps.Create(name, desc, comp.Position, cfg.ShowOnHud, false);
             if (g == null) return false;
-            g.GPSColor = color; gps.AddGps(identityId, g);
+            g.GPSColor = color;
+            gps.RemoveGps(identityId, entry.Hash); s_publishedByHash.Remove(entry.Hash);
+            gps.AddGps(identityId, g);
             entry.Hash = g.Hash; entry.Position = comp.Position; entry.SolidVoxels = comp.SolidVoxels; entry.SpatialRadius = comp.SpatialRadius;
             entry.Count = isField ? fieldCount : 1; entry.IsField = isField; entry.Members = isField ? comp.Members : null;
             s_publishedByHash[g.Hash] = entry;
@@ -579,8 +592,10 @@ public static class AutoGpsService
         // e.g. "Ore - Iron A Compact 63.5k" / "Ore - Ice P Titanic 312M". The trailing number
         // is the calibrated ore kg (k/M/B are magnitude multipliers, not units).
         name = prefix + material + " " + source;
-        if (cfg.ShowQuantity && comp.SolidVoxels > 0)
-            name += " " + SizeWord(oreKg) + " " + Compact(Math.Max(oreKg, 1));
+        // Tier + kg only when a yield is actually computable (modded ores without a baseline
+        // would otherwise show a meaningless "Atom 1").
+        if (cfg.ShowQuantity && oreKg > 0)
+            name += " " + SizeWord(oreKg) + " " + Compact(oreKg);
         if (cfg.IncludeCoordsInName) name += " " + coord;
         var sb = new StringBuilder();
         if (comp.SolidVoxels > 0)
@@ -601,7 +616,6 @@ public static class AutoGpsService
         return v.ToString("F1", CultureInfo.InvariantCulture).TrimEnd('0').TrimEnd('.') + suf;
     }
 
-    // Size tier by ore kg (the mined yield - what the inventory shows). Thresholds tunable.
     // Size tier by CALIBRATED ore kg (vanilla kg x YieldMultiplier; the number in the GPS
     // name is the calibrated kg itself, compact, no units):
     //   < 25k Atom | 25k-100k Compact | 100k-1M Expand | 1M-5M Giant | 5M-30M Huge |
