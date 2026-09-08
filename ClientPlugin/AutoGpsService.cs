@@ -429,13 +429,15 @@ public static class AutoGpsService
         try
         {
             // Create the replacement BEFORE removing the old marker, so a failed create cannot
-            // leave the player without a waypoint.
+            // leave the player without a waypoint.  AddGps first so the entry survives an AddGps
+            // failure — if AddGps throws after RemoveGps, the entry still has a valid hash
+            // in s_publishedByHash and Clear-all can reach it.
             var g = gps.Create(name, desc, newCenter, cfg.ShowOnHud, false);
             if (g == null) return false;
             g.GPSColor = color;
+            gps.AddGps(identityId, g);
             gps.RemoveGps(identityId, entry.Hash);
             s_publishedByHash.Remove(entry.Hash);
-            gps.AddGps(identityId, g);
             // Entry state updated only once the new marker is live.
             entry.Hash = g.Hash;
             entry.Position = newCenter;
@@ -540,12 +542,15 @@ public static class AutoGpsService
             BuildGpsText(material, comp, isField, fieldCount, cfg, out string name, out string desc);
             Color color = s_colors.TryGetValue(material, out var c) ? c : Color.Yellow;
             // Create the replacement BEFORE removing the old marker, so a failed create cannot
-            // leave the player without a waypoint.
+            // leave the player without a waypoint.  AddGps first so the entry survives an AddGps
+            // failure — if AddGps throws after RemoveGps, the entry still has a valid hash
+            // in s_publishedByHash and Clear-all can reach it.
             var g = gps.Create(name, desc, comp.Position, cfg.ShowOnHud, false);
             if (g == null) return false;
             g.GPSColor = color;
-            gps.RemoveGps(identityId, entry.Hash); s_publishedByHash.Remove(entry.Hash);
             gps.AddGps(identityId, g);
+            gps.RemoveGps(identityId, entry.Hash);
+            s_publishedByHash.Remove(entry.Hash);
             entry.Hash = g.Hash; entry.Position = comp.Position; entry.SolidVoxels = comp.SolidVoxels; entry.SpatialRadius = comp.SpatialRadius;
             entry.Count = isField ? fieldCount : 1; entry.IsField = isField; entry.Members = isField ? comp.Members : null;
             s_publishedByHash[g.Hash] = entry;
