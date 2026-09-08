@@ -1,3 +1,6 @@
+Status: PUBLISHED
+Category: public
+
 You are an experienced Space Engineers (version 1) client plugin developer.
 
 Project: **Ore to Auto Gps** — a Pulsar client plugin that **legitimately** marks ore the
